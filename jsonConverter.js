@@ -31,34 +31,46 @@ JSON_CONVERTER.util = {
 	}
 };
 
-//	constructor for DataConverter object
-JSON_CONVERTER.DataConverter = function(json, fieldmatChingcriteria){
+
+/**
+*	constructor for DataConverter
+*
+*	@param 	{string} 	json 			well-formed JSON
+*	@param 	{map} 		fieldMapping	map used to relate form fields to JSON data (optional)
+*	@class 		DataConverter
+**/
+JSON_CONVERTER.DataConverter = function(json, fieldMapping){
+	//	TODO	Consider storing this instance and using the Singleton pattern.
+	//			I don't know if there will ever be a need for more than one instance.
 	
 	//	private variables
 	var jsonObject,
-		jsonValues = []
-		formFields = []
-		fieldmatChingcriteria = fieldmatChingcriteria || [
+		jsonValues = [],
+		fieldMapping = fieldMapping || [
 			{jsonField: 'fieldName', formFieldAttribute: 'param2'},
-			{jsonField: 'tableName', formFieldAttribute: 'param1'}];
+			{jsonField: 'tableName', formFieldAttribute: 'param1'}],
+		matchableFormFields = [];
+
 
 	/**
 	*	Initialization function.
 	**/
 	(function(t){
-		console.log('init DataConverter');
 		
 		//	convert json to object
 		jsonObject = $.parseJSON(json);
 
 		//	cache all values to avoid crawling through huge JSON object repeatedly
 		indexJSONValues();
-		console.log(jsonValues);
+
+		//	identify matchable fields (those with the attributes needed for mapping)
+		matchableFormFields = getMatchableFields(fieldMapping);
 
 		//	populate form fields
-		populateFormFields(fieldmatChingcriteria);
+		populateFormFields(fieldMapping);
 
 	})(this);
+
 
 	/**
 	*	Index the values and their location in the json object.
@@ -120,10 +132,8 @@ JSON_CONVERTER.DataConverter = function(json, fieldmatChingcriteria){
 	*	@return 	{Number}	form fields updated
 	**/
 	function populateFormFields(matchingCriteria){
-		console.log('populateFormFields');
 
-		var matchableFormFields = getMatchableFields(matchingCriteria),
-			matchInJSON;
+		var matchInJSON;
 
 		//	loop through fields to see if we have a coinciding value in the JSON
 		for(var i in matchableFormFields){
@@ -141,14 +151,24 @@ JSON_CONVERTER.DataConverter = function(json, fieldmatChingcriteria){
 			};
 
 			//	populate the data already
-			matchableFormFields[i].value = matchInJSON[0].value;
-			$(matchableFormFields[i]).css('background-color', 'red');
-
+			switch(matchableFormFields[i].type){
+				case 'textarea':
+					matchableFormFields[i].innerHTML = matchInJSON[0].value;
+					break;
+				case 'text':
+					matchableFormFields[i].value = matchInJSON[0].value;
+					break;
+				case 'input':
+				case 'submit':
+					//	don't try and change these
+					break;
+				default:
+					//	This will catch select fields and anything else that was missed.
+					$(matchableFormFields[i]).val(matchInJSON[0].value);
+			};
 		};
-
-
-
 	};
+
 
 	/**
 	*	Find all form fields that have the attributes required for data matching.
@@ -172,9 +192,9 @@ JSON_CONVERTER.DataConverter = function(json, fieldmatChingcriteria){
 			matchable.push(element);
 		});
 
-		console.log('matchable field count: ' + matchable.length)
 		return matchable;
 	};
+
 
 	/**
 	*	Convert data map (forms & JSON) to array used in findMatchesInJSONValues.
@@ -195,6 +215,7 @@ JSON_CONVERTER.DataConverter = function(json, fieldmatChingcriteria){
 		return JSONMap;
 	};
 
+
 	/**
 	*	Find all matches in jsonValues using flexible criteria.
 	*
@@ -213,58 +234,59 @@ JSON_CONVERTER.DataConverter = function(json, fieldmatChingcriteria){
 		return matches;
 	};
 
+	/*****************************/
+	//	public API
+	/*****************************/
+	return {
+
+		//	debugging tools
+
+		getJSON: function(){
+			return jsonObject;
+		},
+		getIndexedJSON: function(){
+			return jsonValues;
+		},
+		getMatchableFields: function(){
+			return getMatchableFields(fieldMapping);
+		},
+		showMatchableFields: function(){
+			var fields = this.getMatchableFields();
+			$(fields).css({'background-color': '#70FF00', 'border': '3px dotted blue'});
+			return fields;
+		},
+
+		/**
+		*
+		*	@param	{object} 	formField 		DOM element to lookup match for
+		*	@param 	{map} 		fieldMapping 	(optional) - current mapping is used if not provided
+		**/
+		getMatchFromIndexedJSON: function(formField, fieldMap){
+			var fieldMap = fieldMap || fieldMapping;
+			console.log('looking for match in indexed JSON for ', formField);
+			console.log('using mapping ', fieldMap);
+			/*
+			var jsonCriteria = convertDataMapToJSONFieldCriteria(matchingCriteria, matchableFormFields[i]);
+			matchInJSON = findMatchesInJSONValues(jsonCriteria);
+			*/
+
+			return;
+		},
+
+		//	permanent API
+
+		save: function(){
+
+		}	
+
+	};
 };
 
 
 
-/*	testing	*/
+/*	testing implementation	*/
 var data;
 
 $(function(){
 	data = new JSON_CONVERTER.DataConverter(json);
-
-
-	//	generate some fields
-/*
-cellInfoListIndex: "4"
-dataRowIndex: "1"
-fieldName: "machine_id"
-tableIndex: "5"
-tableName: "TBRECEIPTLIST"
-value: "100"
-
-cellInfoListIndex: "28"
-dataRowIndex: "1"
-fieldName: "first_name"
-tableIndex: "4"
-tableName: "TBRECLINELIST"
-value: "JASON"
-*/
-/*
-	var tag = ['input', 'textarea', 'select'],
-		type = ['text', 'submit'],
-		param1 = ['TBRECEIPTLIST', 'TBRECLINELIST', 'TBCUSTOMERS', ''],
-		param2 = ['first_name', 'machine_id', 'PREV_ADDR1', ''],
-		ofEachType = 4,
-		i = 0;
-
-	for(; i < ofEachType; i++){
-		for(var j in tag){
-			for(var k in type){
-				for(var m in param1){
-					for(var n in param2){
-						var field = document.createElement(tag[j]);
-						field.name = 'field_' + type[k] + '_' + i;
-						field.type = type[k];
-						document.body.appendChild(field);
-						$(field)
-							.attr('param1', param1[m])
-							.attr('param2', param2[n]);
-					};
-				};
-			};
-		};
-	};
-*/
-
 });
